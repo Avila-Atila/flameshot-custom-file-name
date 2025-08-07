@@ -24,10 +24,12 @@
 #include <QApplication>
 #include <QBuffer>
 #include <QClipboard>
+#include <QDateTime>
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QMimeData>
 #include <QStandardPaths>
+#include <QUrl>
 #include <qimagewriter.h>
 #include <qmimedatabase.h>
 #if defined(Q_OS_MACOS)
@@ -203,8 +205,23 @@ void saveToClipboard(const QPixmap& capture)
 #else
         saveToClipboardMime(capture, "jpeg");
 #endif
+
     } else {
-        // Need to send message before copying to clipboard
+#if defined(Q_OS_WIN)
+        QString tmp =
+          QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+        qint64 ts = QDateTime::currentSecsSinceEpoch();
+        QString filename = QString::number(ts) + QLatin1String(".png");
+        QString path = tmp + QLatin1Char('/') + filename;
+
+        capture.save(path, "PNG");
+
+        auto* md = new QMimeData;
+        md->setImageData(capture);
+        md->setUrls({ QUrl::fromLocalFile(path) });
+        QApplication::clipboard()->setMimeData(md);
+#else
+        // all other platforms keep the old behavior
 #if defined(Q_OS_LINUX) || defined(Q_OS_UNIX)
         if (DesktopInfo().waylandDetected()) {
             saveToClipboardMime(capture, "png");
@@ -213,6 +230,7 @@ void saveToClipboard(const QPixmap& capture)
         }
 #else
         QApplication::clipboard()->setPixmap(capture);
+#endif
 #endif
     }
 }
